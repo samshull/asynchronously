@@ -94,6 +94,7 @@ function wrap(fn, done) {
 
 module.exports = {
   auto,
+  delayed,
   each,
   map,
   reduce,
