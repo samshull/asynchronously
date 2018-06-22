@@ -1,7 +1,16 @@
 'use strict';
 
-function delayed(fn, delay=10) {
-  return new Promise(accept => setTimeout(accept, delay).unref()).then(fn);
+function delayed(fn, ms=10) {
+  const timer = accept => {
+    const t = setTimeout(accept, ms);
+    if (t.unref) return t.unref();
+    return t;
+  };
+  return new Promise(timer).then(fn);
+}
+
+function attempt(fn, ...args) {
+  return new Promise(accept => accept(fn(...args)));
 }
 
 function each(items, limit, iterator) {
@@ -12,7 +21,7 @@ function each(items, limit, iterator) {
   let position = length - 1;
   const end = items.length - 1;
   const chainer = i => {
-    return Promise.resolve(iterator(items[i], i, items))
+    return attempt(iterator, items[i], i, items)
       .then(() => {
         return position < end && chainer(++position);
       });
@@ -29,7 +38,7 @@ function map(items, limit, iterator) {
   let position = length - 1;
   const end = items.length - 1;
   const chainer = i => {
-    return Promise.resolve(iterator(items[i], i, items))
+    return attempt(iterator, items[i], i, items)
       .then(result => {
         results[i] = result;
         if (position < end) {
@@ -45,7 +54,7 @@ function reduce(items, iterator, accumulator = []) {
   let position = 0;
   const end = items.length - 1;
   const chainer = (r, i) => {
-    return Promise.resolve(iterator(r, items[i], i, items))
+    return attempt(iterator, r, items[i], i, items)
       .then(result => {
         return position < end ? chainer(result, ++position) : result;
       });
@@ -81,23 +90,79 @@ function auto(tasks) {
   return Promise.all(keys.map(creator)).then(() => values);
 }
 
-function wrap(fn, done) {
-  const promise = new Promise((accept, reject) => {
-    fn((e, ...args) => {
+function wrap(fn, ...args) {
+  return new Promise((accept, reject) => {
+    fn(...args, (e, ...results) => {
       if (e) return void reject(e);
-      accept(...args);
+      accept(...results);
     });
   });
-  if (done) return promise.then((...args) => done(null, ...args), done);
-  return promise;
+}
+
+function some(items, limit, iterator) {
+  if (typeof limit === 'function') {
+    [limit, iterator] = [Number.POSITIVE_INFINITY, limit];
+  }
+  const errors = [];
+  const length = items.length > limit ? limit : items.length;
+  let position = length - 1;
+  const end = items.length - 1;
+
+  return new Promise((accept, reject) => {
+    let accepted = false;
+    const complete = v => {
+      if (accepted) return;
+      accepted = true;
+      accept(v);
+    };
+    const chainer = i => attempt(iterator, items[i], i, items).then(complete, (e) => {
+      errors[i] = e;
+      return position < end ? chainer(++position) : Promise.resolve();
+    });
+    Promise.all(Array.from({ length }, (_, n) => chainer(n))).then(() => {
+      if (accepted) return;
+      reject(errors);
+    });
+  });
+}
+
+function every(items, limit, iterator) {
+  if (typeof limit === 'function') {
+    [limit, iterator] = [Number.POSITIVE_INFINITY, limit];
+  }
+  const length = items.length > limit ? limit : items.length;
+  let position = length - 1;
+  const end = items.length - 1;
+
+  return new Promise((accept, reject) => {
+    let failed = false;
+    const fail = e => {
+      if (failed) return;
+      failed = true;
+      reject(e);
+    };
+    const next = () => {
+      return position < end && chainer(++position);
+    };
+    const chainer = i => {
+      return attempt(iterator, items[i], i, items).then(next, fail);
+    };
+    Promise.all(Array.from({ length }, (_, n) => chainer(n))).then(() => {
+      if (failed) return;
+      accept();
+    }, reject);
+  });
 }
 
 module.exports = {
+  attempt,
   auto,
   delayed,
   each,
+  every,
   map,
   reduce,
+  some,
   wrap
 };
 
