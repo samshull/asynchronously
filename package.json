@@ -1,6 +1,6 @@
 {
   "name": "asynchronously",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "asynchronously iterate over items and resolve promises instead of callbacks. async library for promises",
   "main": "index.js",
   "directories": {
