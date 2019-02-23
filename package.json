@@ -7,7 +7,14 @@
     "test": "test"
   },
   "scripts": {
-    "test": "mocha"
+    "test": "eslint --fix index.js package.json ./test/* && nyc mocha"
+  },
+  "nyc": {
+    "reporter": [
+      "lcov",
+      "text-summary"
+    ],
+    "report-dir": "./build/coverage"
   },
   "repository": {
     "type": "git",
@@ -22,7 +29,13 @@
   "devDependencies": {
     "assume": "^2.1.0",
     "assume-sinon": "^1.0.0",
+    "eslint": "^5.14.1",
+    "eslint-config-godaddy": "^3.0.0",
+    "eslint-plugin-json": "^1.4.0",
+    "eslint-plugin-mocha": "^5.3.0",
+    "eslint-plugin-security": "^1.4.0",
     "mocha": "^5.2.0",
+    "nyc": "^13.3.0",
     "sinon": "^7.2.3"
   },
   "dependencies": {}

@@ -1,5 +1,3 @@
-'use strict';
-
 const { EventEmitter } = require('events');
 
 const assume = require('assume');
@@ -7,7 +5,24 @@ const { stub } = require('sinon');
 
 assume.use(require('assume-sinon'));
 
-const { delayed, each, map, reduce, auto, wrap, attempt, some, every, once } = require('../');
+const {
+  attempt,
+  auto,
+  delayed,
+  each,
+  every,
+  filter,
+  find,
+  findIndex,
+  map,
+  once,
+  reduce,
+  reduceRight,
+  some,
+  sortBy,
+  wrap,
+  wait
+} = require('../');
 
 const delay = (ms = 10) => new Promise(a => setTimeout(a, ms));
 
@@ -18,8 +33,9 @@ describe('promise helpers', function () {
       return attempt(() => { throw error; }).catch(e => assume(e).equals(error));
     });
 
-    it('should resolve as expected for the arguments given', () => {
-      return attempt((a, b, c) => ({ a, b, c }), 1, 2, 3).then(r => assume(r).eqls({ a: 1, b: 2, c: 3 }));
+    it('should resolve as expected for the arguments given', async () => {
+      const r = await attempt((a, b, c) => ({ a, b, c }), 1, 2, 3);
+      assume(r).eqls({ a: 1, b: 2, c: 3 });
     });
   });
 
@@ -27,7 +43,7 @@ describe('promise helpers', function () {
     it('should not catch errors in the iterator', async () => {
       const error = new Error('intentional error');
       try {
-        await some([1, 2, 3, 4, 5], i => { throw error; });
+        await some([1, 2, 3, 4, 5], () => { throw error; });
         throw new Error('this should not be called');
       } catch (err) {
         assume(err).equals(error);
@@ -36,11 +52,13 @@ describe('promise helpers', function () {
 
     it('should only process the limit of items simultaneously', async () => {
       const resolved = [];
-      return await some([1, 2, 3, 4, 5], 3, i => {
+      return await some([1, 2, 3, 4, 5], 3, async i => {
         if (i === 3) assume(resolved.length).eq(0);
         if (i === 4) assume(resolved.length).gt(0);
         if (i === 5) assume(resolved.length).gt(1);
-        return delay(i*100).then(() => { resolved.push(i); });
+        await delay(i * 100);
+        resolved.push(i);
+        return false;
       });
     });
 
@@ -49,7 +67,7 @@ describe('promise helpers', function () {
     });
 
     it('should race to completion', async () => {
-      return assume(await some([1, 2, 3, 4, 5], i => i === 3 ? i : delay(i*100))).equals(true);
+      return assume(await some([1, 2, 3, 4, 5], i => i === 3 ? i : delay(i * 100))).equals(true);
     });
   });
 
@@ -57,7 +75,7 @@ describe('promise helpers', function () {
     it('should throw any errors', async () => {
       const error = new Error('reject on purpose');
       try {
-        await every([1, 2, 3], i => { throw error; });
+        await every([1, 2, 3], async () => { throw error; });
         throw new Error('this should not be called');
       } catch (err) {
         assume(err).equals(error);
@@ -66,11 +84,13 @@ describe('promise helpers', function () {
 
     it('should only process the limit of items simultaneously', () => {
       const resolved = [];
-      return every([1, 2, 3, 4, 5], 3, i => {
+      return every([1, 2, 3, 4, 5], 3, async i => {
         if (i === 3) assume(resolved.length).eq(0);
         if (i === 4) assume(resolved.length).gt(0);
         if (i === 5) assume(resolved.length).gt(1);
-        return delay(i*100).then(() => { resolved.push(i); });
+        await delay(i * 100);
+        resolved.push(i);
+        return true;
       });
     });
 
@@ -101,7 +121,7 @@ describe('promise helpers', function () {
     it('should wait until the one of the limited iterations has completed before continuing', async () => {
       const resolved = {};
       const base = [1, 2, 3, 4, 5];
-      await each(base, 2, function (arg, index, array) {
+      await each(base, 2, async function (arg, index, array) {
         assume(array).equals(base);
         assume(index).to.be.lessThan(array.length);
         if (arg === 3) {
@@ -113,7 +133,8 @@ describe('promise helpers', function () {
           assume(resolved[3]).to.equal(true);
           assume(resolved[4]).to.be.undefined;
         }
-        return delay(10 * arg).then(() => { resolved[arg] = true; });
+        await delay(10 * arg);
+        resolved[arg] = true;
       });
       assume(resolved[1]).to.equal(true);
       assume(resolved[2]).to.equal(true);
@@ -152,7 +173,7 @@ describe('promise helpers', function () {
     it('should wait until the one of the limited iterations has completed before continuing', async () => {
       const resolved = {};
       const base = [1, 2, 3, 4, 5];
-      const result = await map(base, 2, function (arg, index, array) {
+      const result = await map(base, 2, async function (arg, index, array) {
         assume(array).equals(base);
         assume(index).to.be.lessThan(array.length);
         if (arg === 3) {
@@ -164,7 +185,9 @@ describe('promise helpers', function () {
           assume(resolved[3]).to.equal(true);
           assume(resolved[4]).to.be.undefined;
         }
-        return delay(10 * arg).then(() => { resolved[arg] = true; }).then(() => arg * 2);
+        await delay(10 * arg);
+        resolved[arg] = true;
+        return arg * 2;
       });
       assume(resolved[1]).to.equal(true);
       assume(resolved[2]).to.equal(true);
@@ -182,17 +205,14 @@ describe('promise helpers', function () {
       const resolved = {};
       const base = [1, 2, 3, 4, 5];
       const accumulator = [];
-      const result = await reduce(base, function (memo, arg, index, array) {
+      const result = await reduce(base, async function (memo, arg, index, array) {
         assume(memo).to.equal(accumulator);
         assume(array).to.equal(base);
         assume(index).to.be.lessThan(array.length);
-        return delay(10 * arg)
-          .then(() => {
-            resolved[arg] = true;
-          }).then(() => {
-            memo.push(arg * 2);
-            return memo;
-          });
+        await delay(10 * arg);
+        resolved[arg] = true;
+        memo.push(arg * 2);
+        return memo;
       }, accumulator);
       assume(resolved[1]).to.equal(true);
       assume(resolved[2]).to.equal(true);
@@ -202,6 +222,31 @@ describe('promise helpers', function () {
       assume(Array.isArray(result)).to.equal(true);
       assume(result.length).to.equal(5);
       assume(result).to.deep.equal([2, 4, 6, 8, 10]);
+    });
+  });
+
+  describe('reduceRight', function () {
+    it('should pass the accumulator value in each iteration', async () => {
+      const resolved = {};
+      const base = [1, 2, 3, 4, 5];
+      const accumulator = [];
+      const result = await reduceRight(base, async function (memo, arg, index, array) {
+        assume(memo).to.equal(accumulator);
+        assume(array).to.equal(base);
+        assume(index).to.be.lessThan(array.length);
+        await delay(10 * arg);
+        resolved[arg] = true;
+        memo.push(arg * 2);
+        return memo;
+      }, accumulator);
+      assume(resolved[1]).to.equal(true);
+      assume(resolved[2]).to.equal(true);
+      assume(resolved[3]).to.equal(true);
+      assume(resolved[4]).to.equal(true);
+      assume(resolved[5]).to.equal(true);
+      assume(Array.isArray(result)).to.equal(true);
+      assume(result.length).to.equal(5);
+      assume(result).to.deep.equal([10, 8, 6, 4, 2]);
     });
   });
 
@@ -247,7 +292,7 @@ describe('promise helpers', function () {
 
     it('should wrap a callback function into a promise and reject an error', async () => {
       try {
-        await wrap(cb => setTimeout(() => cb(new Error('expected')), 10))
+        await wrap(cb => setTimeout(() => cb(new Error('expected')), 10));
         throw new Error('this should not have been called');
       } catch (err) {
         assume(err.message).equals('expected');
@@ -289,6 +334,44 @@ describe('promise helpers', function () {
       } catch (e) {
         assume(e.message).equals('timeout');
       }
+    });
+  });
+
+  describe('find', function () {
+    it('should resolve to the first item that passes the test function', async () => {
+      assume(await find([1, 2, 3, 4, 5, 6], 3, async item => item % 3 === 0)).equals(3);
+    });
+  });
+
+  describe('findIndex', function () {
+    it('should resolve to the index of the first item that passes the test function', async () => {
+      assume(await findIndex([1, 2, 3, 4, 5, 6], 3, async item => item % 3 === 0)).equals(2);
+    });
+  });
+
+  describe('filter', function () {
+    it('should return an array with only items that pass the test function', async () => {
+      assume(await filter([1, 2, 3, 4, 5, 6], 2, async item => item % 2 === 0)).eqls([2, 4, 6]);
+    });
+  });
+
+  describe('wait', function () {
+    it('should delay the default number of milliseconds', async () => {
+      const start = Date.now();
+      await wait();
+      assume(Date.now() - 10).gte(start);
+    });
+
+    it('should delay the specified number of milliseconds', async () => {
+      const start = Date.now();
+      await wait(100);
+      assume(Date.now() - 100).gte(start);
+    });
+  });
+
+  describe('sortBy', function () {
+    it('should return a sorted array using the values specified returned by the iterator function', async () => {
+      assume(await sortBy([2, 4, 6, 1, 5, 3], 2, async item => item)).eqls([1, 2, 3, 4, 5, 6]);
     });
   });
 });
