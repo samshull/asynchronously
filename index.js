@@ -1,5 +1,3 @@
-'use strict';
-
 async function delayed(fn, ms = 10) {
   await wait(ms);
   return await fn();
@@ -28,7 +26,7 @@ async function each(items, limit, iterator) {
     await attempt(iterator, item, position, items);
     return parts.length && chainer(i++, parts.shift());
   };
-  const simultaneous = Array.from({ length }, (_, n) => chainer(i++, parts.shift()));
+  const simultaneous = Array.from({ length }, () => chainer(i++, parts.shift()));
   await Promise.all(simultaneous);
   return items;
 }
@@ -58,6 +56,16 @@ async function reduce(items, iterator, accumulator) {
     return parts.length ? chainer(previous, parts.shift(), i++) : previous;
   };
   return await chainer(accumulator, parts.shift(), i++);
+}
+
+async function reduceRight(items, iterator, accumulator) {
+  const parts = Array.from(items);
+  let i = parts.length;
+  const chainer = async (value, item, position) => {
+    const previous = await attempt(iterator, value, item, position, items);
+    return parts.length ? chainer(previous, parts.pop(), --i) : previous;
+  };
+  return await chainer(accumulator, parts.pop(), --i);
 }
 
 async function auto(tasks) {
@@ -99,6 +107,65 @@ async function wrap(fn, ...args) {
   });
 }
 
+async function find(items, limit, iterator) {
+  if (typeof limit === 'function') {
+    [limit, iterator] = [Number.POSITIVE_INFINITY, limit];
+  }
+  const parts = Array.from(items);
+  const length = parts.length > limit ? limit : parts.length;
+  let i = 0;
+  let found;
+  const chainer = async (position, item) => {
+    if (found) return;
+    if (await attempt(iterator, item, position, items)) {
+      if (found) return;
+      found = item;
+      return item;
+    }
+    if (parts.length) return chainer(i++, parts.shift());
+  };
+  const simultaneous = Array.from({ length }, () => chainer(i++, parts.shift()));
+  await Promise.all(simultaneous);
+  return found;
+}
+
+async function findIndex(items, limit, iterator) {
+  return Array.from(items).indexOf(await find(items, limit, iterator));
+}
+
+async function filter(items, limit, iterator) {
+  if (typeof limit === 'function') {
+    [limit, iterator] = [Number.POSITIVE_INFINITY, limit];
+  }
+  const parts = Array.from(items);
+  const length = parts.length > limit ? limit : parts.length;
+  let i = 0;
+  const found = [];
+  const chainer = async (position, item) => {
+    if (await attempt(iterator, item, position, items)) {
+      found.push(item);
+    }
+    if (parts.length) return chainer(i++, parts.shift());
+  };
+  const simultaneous = Array.from({ length }, () => chainer(i++, parts.shift()));
+  await Promise.all(simultaneous);
+  return found;
+}
+
+function comparator(a, b) {
+  return a.criteria - b.criteria;
+}
+
+async function sortBy(items, limit, iterator) {
+  if (typeof limit === 'function') {
+    [limit, iterator] = [Number.POSITIVE_INFINITY, limit];
+  }
+  const meta = await map(items, limit, async (item, index) => {
+    return { item, criteria: await attempt(iterator, item, index, items) };
+  });
+  return meta.sort(comparator).map(entry => entry.item);
+}
+
 async function some(items, limit, iterator) {
   if (typeof limit === 'function') {
     [limit, iterator] = [Number.POSITIVE_INFINITY, limit];
@@ -109,12 +176,14 @@ async function some(items, limit, iterator) {
   let passed = false;
   const chainer = async (position, item) => {
     if (passed) return true;
-    passed = await attempt(iterator, item, position, items);
-    if (passed) return true;
+    if (await attempt(iterator, item, position, items)) {
+      passed = true;
+      return true;
+    }
     if (parts.length) return chainer(i++, parts.shift());
   };
   const simultaneous = Array.from({ length }, () => chainer(i++, parts.shift()));
-  await Promise.race(simultaneous);
+  await Promise.all(simultaneous);
   return !!passed;
 }
 
@@ -137,25 +206,33 @@ async function every(items, limit, iterator) {
   return passing;
 }
 
-function on(target, event, callback) {
-  const on = target.addEventListener || target.addListener;
-  const off = target.removeEventListener || target.removeListener;
-  on.call(target, event, function handler(...args) {
-    off.call(target, event, handler);
-    if (args.length === 1) return void callback(args[0]);
-    callback(args);
-  });
-}
-
 async function once(events, target, timeout = -1) {
-  let result;
-  const simultaneous = [].concat(events).map(event => new Promise(accept => on(target, event, accept)));
-  if (timeout > -1) {
-    simultaneous.push(delayed(() => { if (!result) throw new Error('timeout'); }, timeout));
-  }
-  result = await Promise.race(simultaneous);
-  if (result instanceof Error) throw result;
-  return result;
+  events = [].concat(events);
+  return await new Promise(function (accept, reject) {
+    let timer, complete;
+    const on = target.addEventListener || target.addListener;
+    const off = target.removeEventListener || target.removeListener;
+    events.forEach(event => on.call(target, event, finish));
+    if (timeout > 0) {
+      timer = setTimeout(() => finish(new Error('timeout')), timeout);
+      if (typeof timer.unref === 'function') timer.unref();
+    }
+
+    function finish(...args) {
+      if (complete) return;
+      complete = true;
+      events.map(event => off.call(target, event, finish));
+      if (timer) clearTimeout(timer);
+      timer = null;
+      if (args.length === 1) {
+        if (args[0] instanceof Error) {
+          return void reject(args[0]);
+        }
+        return void accept(args[0]);
+      }
+      accept(args);
+    }
+  });
 }
 
 module.exports = {
@@ -164,10 +241,15 @@ module.exports = {
   delayed,
   each,
   every,
+  find,
+  filter,
+  findIndex,
   map,
   once,
   reduce,
+  reduceRight,
   some,
+  sortBy,
   wait,
   wrap
 };
