@@ -7,7 +7,19 @@
     "test": "test"
   },
   "scripts": {
-    "test": "eslint --fix index.js package.json ./test/* && nyc mocha"
+    "lint": "eslint --fix index.js package.json ./test/*",
+    "pretest": "npm run lint",
+    "test": "nyc mocha"
+  },
+  "pre-commit": {
+    "run": [
+      "lint"
+    ]
+  },
+  "pre-push": {
+    "run": [
+      "test"
+    ]
   },
   "nyc": {
     "reporter": [
@@ -29,13 +41,15 @@
   "devDependencies": {
     "assume": "^2.2.0",
     "assume-sinon": "^1.0.1",
-    "eslint": "^5.16.0",
+    "eslint": "^6.0.1",
     "eslint-config-godaddy": "^3.1.0",
     "eslint-plugin-json": "^1.4.0",
     "eslint-plugin-mocha": "^5.3.0",
     "eslint-plugin-security": "^1.4.0",
     "mocha": "^6.1.4",
     "nyc": "^14.1.1",
+    "pre-commit": "^1.2.2",
+    "pre-push": "^0.1.1",
     "sinon": "^7.3.2"
   },
   "dependencies": {}

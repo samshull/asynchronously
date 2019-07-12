@@ -6,6 +6,8 @@ const { stub } = require('sinon');
 assume.use(require('assume-sinon'));
 
 const {
+  allSettled,
+  anySettled,
   attempt,
   auto,
   delayed,
@@ -372,6 +374,24 @@ describe('promise helpers', function () {
   describe('sortBy', function () {
     it('should return a sorted array using the values specified returned by the iterator function', async () => {
       assume(await sortBy([2, 4, 6, 1, 5, 3], 2, async item => item)).eqls([1, 2, 3, 4, 5, 6]);
+    });
+  });
+
+  describe('allSettled', function () {
+    it('should wait until all the promises have either resolved or rejected', async () => {
+      const promises = Array.from({ length: 20 }, (_, i) => new Promise((resolve, reject) => {
+        setTimeout(() => i % 2 ? reject(`e${i}`) : resolve(i), 100 * i);
+      }));
+      assume(await allSettled(promises)).eqls([0, 'e1', 2, 'e3', 4, 'e5', 6, 'e7', 8, 'e9', 10, 'e11', 12, 'e13', 14, 'e15', 16, 'e17', 18, 'e19']);
+    });
+  });
+
+  describe('anySettled', function () {
+    it('should wait until at least one the promises have either resolved or rejected', async () => {
+      const promises = Array.from({ length: 20 }, (_, i) => new Promise((resolve, reject) => {
+        setTimeout(() => i % 2 === 0 ? reject(`e${i}`) : resolve(i), 100 * i);
+      }));
+      assume(await anySettled(promises)).equals('e0');
     });
   });
 });

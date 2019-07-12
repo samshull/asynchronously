@@ -20,7 +20,7 @@ async function each(items, limit, iterator) {
     [limit, iterator] = [Number.POSITIVE_INFINITY, limit];
   }
   const parts = Array.from(items);
-  const length = parts.length > limit ? limit : parts.length;
+  const length = Math.min(limit, parts.length);
   let i = 0;
   const chainer = async (position, item) => {
     await attempt(iterator, item, position, items);
@@ -36,7 +36,7 @@ async function map(items, limit, iterator) {
     [limit, iterator] = [Number.POSITIVE_INFINITY, limit];
   }
   const parts = Array.from(items);
-  const length = parts.length > limit ? limit : parts.length;
+  const length = Math.min(limit, parts.length);
   const results = [];
   let i = 0;
   const chainer = async (position, item) => {
@@ -112,7 +112,7 @@ async function find(items, limit, iterator) {
     [limit, iterator] = [Number.POSITIVE_INFINITY, limit];
   }
   const parts = Array.from(items);
-  const length = parts.length > limit ? limit : parts.length;
+  const length = Math.min(limit, parts.length);
   let i = 0;
   let found;
   const chainer = async (position, item) => {
@@ -138,7 +138,7 @@ async function filter(items, limit, iterator) {
     [limit, iterator] = [Number.POSITIVE_INFINITY, limit];
   }
   const parts = Array.from(items);
-  const length = parts.length > limit ? limit : parts.length;
+  const length = Math.min(limit, parts.length);
   let i = 0;
   const found = [];
   const chainer = async (position, item) => {
@@ -171,7 +171,7 @@ async function some(items, limit, iterator) {
     [limit, iterator] = [Number.POSITIVE_INFINITY, limit];
   }
   const parts = Array.from(items);
-  const length = parts.length > limit ? limit : parts.length;
+  const length = Math.min(limit, parts.length);
   let i = 0;
   let passed = false;
   const chainer = async (position, item) => {
@@ -187,12 +187,34 @@ async function some(items, limit, iterator) {
   return !!passed;
 }
 
+async function anySettled(promises) {
+  const completed = arg => Promise.resolve(arg);
+  const list = [];
+
+  for (const promise of promises) {
+    list.push(promise.then(completed, completed));
+  }
+
+  return await Promise.race(list);
+}
+
+async function allSettled(promises) {
+  const completed = arg => Promise.resolve(arg);
+  const list = [];
+
+  for (const promise of promises) {
+    list.push(promise.then(completed, completed));
+  }
+
+  return await Promise.all(list);
+}
+
 async function every(items, limit, iterator) {
   if (typeof limit === 'function') {
     [limit, iterator] = [Number.POSITIVE_INFINITY, limit];
   }
   const parts = Array.from(items);
-  const length = parts.length > limit ? limit : parts.length;
+  const length = Math.min(limit, parts.length);
   let i = 0;
   let passing = true;
   const chainer = async (position, item) => {
@@ -236,6 +258,8 @@ async function once(events, target, timeout = -1) {
 }
 
 module.exports = {
+  allSettled,
+  anySettled,
   attempt,
   auto,
   delayed,
