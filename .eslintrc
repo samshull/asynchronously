@@ -3,6 +3,7 @@
   extends: ['godaddy'],
   plugins: ['security'],
   rules: {
+    require-atomic-updates: 'warn',
     object-curly-spacing: [2, "always"],
     arrow-parens: [2, "as-needed"],
     quote-props: [2, "as-needed"],
