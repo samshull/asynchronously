@@ -31,6 +31,14 @@ async function each(items, limit, iterator) {
   return items;
 }
 
+async function collect(iterator) {
+  const result = [];
+  for await (const item of iterator) {
+    result.push(item);
+  }
+  return result;
+}
+
 async function map(items, limit, iterator) {
   if (typeof limit === 'function') {
     [limit, iterator] = [Number.POSITIVE_INFINITY, limit];
@@ -262,6 +270,7 @@ module.exports = {
   anySettled,
   attempt,
   auto,
+  collect,
   delayed,
   each,
   every,
