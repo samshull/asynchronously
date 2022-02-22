@@ -1,11 +1,13 @@
-const { EventEmitter } = require('events');
 
-const assume = require('assume');
-const { stub } = require('sinon');
+import { EventEmitter } from 'events';
 
-assume.use(require('assume-sinon'));
+import assume from 'assume';
+import { stub } from 'sinon';
+import assumeSinon from 'assume-sinon';
 
-const {
+assume.use(assumeSinon);
+
+import {
   allSettled,
   anySettled,
   attempt,
@@ -25,7 +27,7 @@ const {
   sortBy,
   wrap,
   wait
-} = require('../');
+} from '../index.js';
 
 const delay = (ms = 10) => new Promise(a => setTimeout(a, ms));
 
