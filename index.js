@@ -1,9 +1,9 @@
-async function delayed(fn, ms = 10) {
+export async function delayed(fn, ms = 10) {
   await wait(ms);
   return await fn();
 }
 
-async function wait(ms = 10) {
+export async function wait(ms = 10) {
   const timer = accept => {
     const time = setTimeout(accept, ms);
     if (typeof time.unref === 'function') time.unref();
@@ -11,11 +11,11 @@ async function wait(ms = 10) {
   await new Promise(timer);
 }
 
-async function attempt(fn, ...args) {
+export async function attempt(fn, ...args) {
   return await fn(...args);
 }
 
-async function each(items, limit, iterator) {
+export async function each(items, limit, iterator) {
   if (typeof limit === 'function') {
     [limit, iterator] = [Number.POSITIVE_INFINITY, limit];
   }
@@ -31,7 +31,7 @@ async function each(items, limit, iterator) {
   return items;
 }
 
-async function collect(iterator) {
+export async function collect(iterator) {
   const result = [];
   for await (const item of iterator) {
     result.push(item);
@@ -39,7 +39,7 @@ async function collect(iterator) {
   return result;
 }
 
-async function map(items, limit, iterator) {
+export async function map(items, limit, iterator) {
   if (typeof limit === 'function') {
     [limit, iterator] = [Number.POSITIVE_INFINITY, limit];
   }
@@ -56,7 +56,7 @@ async function map(items, limit, iterator) {
   return results;
 }
 
-async function reduce(items, iterator, accumulator) {
+export async function reduce(items, iterator, accumulator) {
   const parts = Array.from(items);
   let i = 0;
   const chainer = async (value, item, position) => {
@@ -66,7 +66,7 @@ async function reduce(items, iterator, accumulator) {
   return await chainer(accumulator, parts.shift(), i++);
 }
 
-async function reduceRight(items, iterator, accumulator) {
+export async function reduceRight(items, iterator, accumulator) {
   const parts = Array.from(items);
   let i = parts.length;
   const chainer = async (value, item, position) => {
@@ -76,7 +76,7 @@ async function reduceRight(items, iterator, accumulator) {
   return await chainer(accumulator, parts.pop(), --i);
 }
 
-async function auto(tasks) {
+export async function auto(tasks) {
   const keys = Object.keys(tasks);
   const promises = {};
   const values = {};
@@ -105,7 +105,7 @@ async function auto(tasks) {
   return values;
 }
 
-async function wrap(fn, ...args) {
+export async function wrap(fn, ...args) {
   return await new Promise((accept, reject) => {
     fn(...args, (e, ...results) => {
       if (e) return void reject(e);
@@ -115,7 +115,7 @@ async function wrap(fn, ...args) {
   });
 }
 
-async function find(items, limit, iterator) {
+export async function find(items, limit, iterator) {
   if (typeof limit === 'function') {
     [limit, iterator] = [Number.POSITIVE_INFINITY, limit];
   }
@@ -137,11 +137,11 @@ async function find(items, limit, iterator) {
   return found;
 }
 
-async function findIndex(items, limit, iterator) {
+export async function findIndex(items, limit, iterator) {
   return Array.from(items).indexOf(await find(items, limit, iterator));
 }
 
-async function filter(items, limit, iterator) {
+export async function filter(items, limit, iterator) {
   if (typeof limit === 'function') {
     [limit, iterator] = [Number.POSITIVE_INFINITY, limit];
   }
@@ -164,7 +164,7 @@ function comparator(a, b) {
   return a.criteria - b.criteria;
 }
 
-async function sortBy(items, limit, iterator) {
+export async function sortBy(items, limit, iterator) {
   if (typeof limit === 'function') {
     [limit, iterator] = [Number.POSITIVE_INFINITY, limit];
   }
@@ -174,7 +174,7 @@ async function sortBy(items, limit, iterator) {
   return meta.sort(comparator).map(entry => entry.item);
 }
 
-async function some(items, limit, iterator) {
+export async function some(items, limit, iterator) {
   if (typeof limit === 'function') {
     [limit, iterator] = [Number.POSITIVE_INFINITY, limit];
   }
@@ -195,7 +195,7 @@ async function some(items, limit, iterator) {
   return !!passed;
 }
 
-async function anySettled(promises) {
+export async function anySettled(promises) {
   const completed = arg => Promise.resolve(arg);
   const list = [];
 
@@ -206,7 +206,7 @@ async function anySettled(promises) {
   return await Promise.race(list);
 }
 
-async function allSettled(promises) {
+export async function allSettled(promises) {
   const completed = arg => Promise.resolve(arg);
   const list = [];
 
@@ -217,7 +217,7 @@ async function allSettled(promises) {
   return await Promise.all(list);
 }
 
-async function every(items, limit, iterator) {
+export async function every(items, limit, iterator) {
   if (typeof limit === 'function') {
     [limit, iterator] = [Number.POSITIVE_INFINITY, limit];
   }
@@ -236,7 +236,7 @@ async function every(items, limit, iterator) {
   return passing;
 }
 
-async function once(events, target, timeout = -1) {
+export async function once(events, target, timeout = -1) {
   events = [].concat(events);
   return await new Promise(function (accept, reject) {
     let timer, complete;
@@ -264,26 +264,3 @@ async function once(events, target, timeout = -1) {
     }
   });
 }
-
-module.exports = {
-  allSettled,
-  anySettled,
-  attempt,
-  auto,
-  collect,
-  delayed,
-  each,
-  every,
-  find,
-  filter,
-  findIndex,
-  map,
-  once,
-  reduce,
-  reduceRight,
-  some,
-  sortBy,
-  wait,
-  wrap
-};
-
